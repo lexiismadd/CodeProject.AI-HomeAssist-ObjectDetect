@@ -1,5 +1,7 @@
 # CodeProject.AI Home Assistant Object Detection custom component
 
+## This version has been updated to fix the issue with "ANITALIAS" command being deprecated in Pillow >= 10 in latest HomeAssistant (as of 06/08/2023)
+
 This component is a direct port of the [HASS-Deepstack-object](https://github.com/robmarkcole/HASS-Deepstack-object) component by [Robin Cole](https://github.com/robmarkcole). This component provides AI-based Object Detection capabilities using [CodeProject.AI Server](https://codeproject.com/ai). 
 
  [CodeProject.AI Server](https://codeproject.com/ai) is a service which runs either in a Docker container or as a Windows Service and exposes various an API for many AI inferencing operations via a REST API. The Object Detection capabilities use the [YOLO](https://arxiv.org/pdf/1506.02640.pdf) algorithm as implemented by Ultralytics and others. It can identify 80 different kinds of objects by default, but custom models are also available that focus on specific objects such as animals, license plates or objects typically encountered by home webcams. CodeProject.AI Server is free, locally installed, and can run without an external internet connection, is is comatible with Windows, Linux, macOS. It can run on Raspberry Pi, and supports CUDA and embedded Intel GPUs.
