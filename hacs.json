@@ -1,5 +1,4 @@
 {
-    "name": "CodeProject.AI Object Detection ",
-    "homeassistant": "2022.10.5",
-    "render_readme": true,
+  "name": "CodeProject.AI Object Detection",
+  "render_readme": true
 }
