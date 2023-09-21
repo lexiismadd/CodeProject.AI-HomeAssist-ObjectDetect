@@ -9,6 +9,7 @@
   ],
   "dependencies": [],
   "codeowners": [
-    "@codeproject"
+    "@codeproject",
+    "@NeoMod"
   ]
 }
