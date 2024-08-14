@@ -225,14 +225,16 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
     """Set up the classifier."""
     save_file_folder = config.get(CONF_SAVE_FILE_FOLDER)
     use_subfolders=config.get(CONF_USE_SUBFOLDERS),
-    camera_entity=camera.get(CONF_ENTITY_ID),
-    if save_file_folder and use_subfolders==False:
+    if save_file_folder:
         save_file_folder = Path(save_file_folder)
-    elif save_file_folder and use_subfolders==True:
-        save_file_folder = Path(save_file_folder / split_entity_id(camera_entity)[1])
 
     entities = []
     for camera in config[CONF_SOURCE]:
+        if save_file_folder and use_subfolders==True:
+            camera_save_file_folder = Path(config.get(CONF_SAVE_FILE_FOLDER) / split_entity_id(camera.get(CONF_ENTITY_ID))[1])
+        else:
+            camera_save_file_folder = save_file_folder
+            
         object_entity = ObjectClassifyEntity(
             ip_address=config.get(CONF_IP_ADDRESS),
             port=config.get(CONF_PORT),
@@ -246,16 +248,16 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
             roi_x_max=config[CONF_ROI_X_MAX],
             scale=config[CONF_SCALE],
             show_boxes=config[CONF_SHOW_BOXES],
-            save_file_folder=save_file_folder,
+            save_file_folder=camera_save_file_folder,
             save_file_format=config[CONF_SAVE_FILE_FORMAT],
             save_timestamped_file=config.get(CONF_SAVE_TIMESTAMPTED_FILE),
             always_save_latest_file=config.get(CONF_ALWAYS_SAVE_LATEST_FILE),
-            use_subfolders=use_subfolders,
             filename_prefix=config.get(CONF_FILENAME_PREFIX),
             object_box_colour=config.get(CONF_OBJECT_BOX_COLOUR),
             roi_box_colour=config.get(CONF_ROI_BOX_COLOUR),
             crop_roi=config[CONF_CROP_ROI],
-            camera_entity=camera_entity,
+            use_subfolders=use_subfolders,
+            camera_entity=camera.get(CONF_ENTITY_ID),
             name=camera.get(CONF_NAME),
         )
         entities.append(object_entity)
