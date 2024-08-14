@@ -70,6 +70,10 @@ CONF_SAVE_FILE_FORMAT = "save_file_format"
 CONF_SAVE_FILE_FOLDER = "save_file_folder"
 CONF_SAVE_TIMESTAMPTED_FILE = "save_timestamped_file"
 CONF_ALWAYS_SAVE_LATEST_FILE = "always_save_latest_file"
+CONF_USE_SUBFOLDERS = "use_subfolders"
+CONF_FILENAME_PREFIX = "filename_prefix"
+CONF_OBJECT_BOX_COLOUR = "object_box_colour"
+CONF_ROI_BOX_COLOUR = "roi_box_colour"
 CONF_SHOW_BOXES = "show_boxes"
 CONF_ROI_Y_MIN = "roi_y_min"
 CONF_ROI_X_MIN = "roi_x_min"
@@ -103,10 +107,6 @@ MIN_CONFIDENCE = 0.1
 JPG = "jpg"
 PNG = "png"
 
-# rgb(red, green, blue)
-RED = (255, 0, 0)  # For objects within the ROI
-GREEN = (0, 255, 0)  # For ROI box
-YELLOW = (255, 255, 0)  # Unused
 
 TARGETS_SCHEMA = {
     vol.Required(CONF_TARGET): cv.string,
@@ -137,10 +137,19 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
         vol.Optional(CONF_SAVE_FILE_FORMAT, default=JPG): vol.In([JPG, PNG]),
         vol.Optional(CONF_SAVE_TIMESTAMPTED_FILE, default=False): cv.boolean,
         vol.Optional(CONF_ALWAYS_SAVE_LATEST_FILE, default=False): cv.boolean,
+        vol.Optional(CONF_USE_SUBFOLDERS, default=False): cv.boolean,
+        vol.Optional(CONF_FILENAME_PREFIX, default=""): cv.string,
+        vol.Optional(CONF_OBJECT_BOX_COLOUR, default="#FF0000"): cv.string,
+        vol.Optional(CONF_ROI_BOX_COLOUR, default="#00FF00"): cv.string,
         vol.Optional(CONF_SHOW_BOXES, default=True): cv.boolean,
         vol.Optional(CONF_CROP_ROI, default=False): cv.boolean,
     }
 )
+
+# rgb(red, green, blue)
+RED = (255, 0, 0)  # For objects within the ROI - tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
+GREEN = (0, 255, 0)  # For ROI box
+YELLOW = (255, 255, 0)  # Unused
 
 Box = namedtuple("Box", "y_min x_min y_max x_max")
 Point = namedtuple("Point", "y x")
@@ -215,8 +224,12 @@ def get_objects(predictions: list, img_width: int, img_height: int) -> List[Dict
 def setup_platform(hass, config, add_devices, discovery_info=None):
     """Set up the classifier."""
     save_file_folder = config.get(CONF_SAVE_FILE_FOLDER)
-    if save_file_folder:
+    use_subfolders=config.get(CONF_USE_SUBFOLDERS),
+    camera_entity=camera.get(CONF_ENTITY_ID),
+    if save_file_folder and use_subfolders==False:
         save_file_folder = Path(save_file_folder)
+    elif save_file_folder and use_subfolders==True:
+        save_file_folder = Path(save_file_folder / split_entity_id(camera_entity)[1])
 
     entities = []
     for camera in config[CONF_SOURCE]:
@@ -237,8 +250,12 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
             save_file_format=config[CONF_SAVE_FILE_FORMAT],
             save_timestamped_file=config.get(CONF_SAVE_TIMESTAMPTED_FILE),
             always_save_latest_file=config.get(CONF_ALWAYS_SAVE_LATEST_FILE),
+            use_subfolders=use_subfolders,
+            filename_prefix=config.get(CONF_FILENAME_PREFIX),
+            object_box_colour=config.get(CONF_OBJECT_BOX_COLOUR),
+            roi_box_colour=config.get(CONF_ROI_BOX_COLOUR),
             crop_roi=config[CONF_CROP_ROI],
-            camera_entity=camera.get(CONF_ENTITY_ID),
+            camera_entity=camera_entity,
             name=camera.get(CONF_NAME),
         )
         entities.append(object_entity)
@@ -266,6 +283,10 @@ class ObjectClassifyEntity(ImageProcessingEntity):
         save_file_format,
         save_timestamped_file,
         always_save_latest_file,
+        use_subfolders,
+        filename_prefix,
+        object_box_colour,
+        roi_box_colour,
         crop_roi,
         camera_entity,
         name=None,
@@ -289,12 +310,17 @@ class ObjectClassifyEntity(ImageProcessingEntity):
         self._targets_names = [
             target[CONF_TARGET] for target in targets
         ]  # can be a name or a type
+        self._object_box_colour = tuple(int(object_box_colour.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))
+        self._roi_box_colour = tuple(int(roi_box_colour.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))
+        self._filename_prefix = filename_prefix
+
         self._camera = camera_entity
+        self._camera_name = split_entity_id(camera_entity)[1]
         if name:
             self._name = name
         else:
-            camera_name = split_entity_id(camera_entity)[1]
-            self._name = "codeproject_ai_object_{}".format(camera_name)
+            # camera_name = split_entity_id(camera_entity)[1]
+            self._name = f"{self._filename_prefix}{self._camera_name}"
 
         self._state = None
         self._objects = []  # The parsed raw data
@@ -316,7 +342,7 @@ class ObjectClassifyEntity(ImageProcessingEntity):
         self._save_file_format = save_file_format
         self._always_save_latest_file = always_save_latest_file
         self._save_timestamped_file = save_timestamped_file
-        self._always_save_latest_file = always_save_latest_file
+        self._use_subfolders = use_subfolders
         self._image = None
 
     def process_image(self, image):
@@ -460,6 +486,8 @@ class ObjectClassifyEntity(ImageProcessingEntity):
             attr[CONF_SAVE_FILE_FORMAT] = self._save_file_format
             attr[CONF_SAVE_TIMESTAMPTED_FILE] = self._save_timestamped_file
             attr[CONF_ALWAYS_SAVE_LATEST_FILE] = self._always_save_latest_file
+            attr[CONF_USE_SUBFOLDERS] = self._use_subfolders
+            attr[CONF_FILENAME_PREFIX] = self._filename_prefix
         return attr
 
     def save_image(self, targets, directory) -> str:
@@ -482,7 +510,7 @@ class ObjectClassifyEntity(ImageProcessingEntity):
                 img.width,
                 img.height,
                 text="ROI",
-                color=GREEN,
+                color=self._roi_box_colour,
             )
 
         for obj in targets:
@@ -500,14 +528,14 @@ class ObjectClassifyEntity(ImageProcessingEntity):
                 img.width,
                 img.height,
                 text=box_label,
-                color=RED,
+                color=self._object_box_colour,
             )
 
             # draw bullseye
             draw.text(
                 (centroid["x"] * img.width, centroid["y"] * img.height),
                 text="X",
-                fill=RED,
+                fill=self._object_box_colour,
             )
 
         # Save images, returning the path of saved image as str
