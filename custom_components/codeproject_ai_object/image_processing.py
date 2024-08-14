@@ -230,6 +230,11 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
 
     entities = []
     for camera in config[CONF_SOURCE]:
+        if save_file_folder and use_subfolders==True:
+            camera_save_file_folder = Path(config.get(CONF_SAVE_FILE_FOLDER) / split_entity_id(camera.get(CONF_ENTITY_ID))[1])
+        else:
+            camera_save_file_folder = save_file_folder
+            
         object_entity = ObjectClassifyEntity(
             ip_address=config.get(CONF_IP_ADDRESS),
             port=config.get(CONF_PORT),
@@ -243,7 +248,7 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
             roi_x_max=config[CONF_ROI_X_MAX],
             scale=config[CONF_SCALE],
             show_boxes=config[CONF_SHOW_BOXES],
-            save_file_folder=save_file_folder,
+            save_file_folder=camera_save_file_folder,
             save_file_format=config[CONF_SAVE_FILE_FORMAT],
             save_timestamped_file=config.get(CONF_SAVE_TIMESTAMPTED_FILE),
             always_save_latest_file=config.get(CONF_ALWAYS_SAVE_LATEST_FILE),
@@ -255,8 +260,6 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
             camera_entity=camera.get(CONF_ENTITY_ID),
             name=camera.get(CONF_NAME),
         )
-        if save_file_folder and use_subfolders==True:
-            save_file_folder = Path(config.get(CONF_SAVE_FILE_FOLDER) / split_entity_id(camera.get(CONF_ENTITY_ID))[1])
         entities.append(object_entity)
     add_devices(entities)
 
